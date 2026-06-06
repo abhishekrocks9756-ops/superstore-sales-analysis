@@ -10,7 +10,7 @@ An end-to-end **Data Analytics project** on Global Superstore dataset with **51,
 
 ---
 
-## 📊 Dashboard Preview
+## 📊 Power BI Dashboard
 
 ### Page 1 — Executive Dashboard
 ![Executive Dashboard](page1_executive.png)
@@ -29,11 +29,15 @@ An end-to-end **Data Analytics project** on Global Superstore dataset with **51,
 superstore-sales-analysis/
 │
 ├── README.md
-├── analysis.sql              ← All SQL queries
-├── page1_executive.png       ← Dashboard screenshot
-├── page2_customer.png        ← Dashboard screenshot
-├── page3_regional.png        ← Dashboard screenshot
-└── pp.pbix                   ← Power BI dashboard file
+├── analysis.sql               ← All SQL queries
+├── page1_executive.png        ← Dashboard screenshot
+├── page2_customer.png         ← Dashboard screenshot
+├── page3_regional.png         ← Dashboard screenshot
+├── KPI_RESULTS.png            ← SQL output
+├── SALE_BY_CATEGORY.png       ← SQL output
+├── top_customers_region.png   ← SQL output
+├── MOM_GROWTH.png             ← SQL output
+└── pp.pbix                    ← Power BI dashboard file
 ```
 
 ---
@@ -50,7 +54,7 @@ superstore-sales-analysis/
 
 ## 📈 Key Insights
 
-- 💰 **Total Sales:** ~$13 Million across all markets
+- 💰 **Total Sales:** ~$25 Million across all markets
 - 📦 **Total Orders:** 25,000+
 - 👥 **Total Customers:** 5,000+
 - 📊 **Profit Margin:** 11.61%
@@ -62,60 +66,69 @@ superstore-sales-analysis/
 
 ---
 
-## 📋 SQL Analysis Highlights
+## 🧠 SQL Queries Used
+
+### 1. KPI Results — Total Sales, Profit, Orders, Customers
+![KPI Results](KPI_RESULTS.png)
 
 ```sql
--- Total Business Overview
-SELECT 
-    COUNT(*) AS Total_Orders,
-    ROUND(SUM(Sales), 2) AS Total_Sales,
-    ROUND(SUM(Profit), 2) AS Total_Profit,
-    ROUND((SUM(Profit)/SUM(Sales))*100, 2) AS Profit_Margin_Pct
-FROM superstore;
+SELECT SUM(sales) AS Total_Sales FROM superstore;
+SELECT SUM(profit) AS Total_Profit FROM superstore;
+SELECT COUNT(DISTINCT order_id) AS Total_Orders FROM superstore;
+SELECT COUNT(DISTINCT customer_id) AS Total_Customers FROM superstore;
+```
 
--- Category wise Sales & Profit
-SELECT 
-    Category,
-    ROUND(SUM(Sales), 2) AS Total_Sales,
-    ROUND(SUM(Profit), 2) AS Total_Profit,
-    COUNT(*) AS Total_Orders
+---
+
+### 2. Sales by Category
+![Sales by Category](SALE_BY_CATEGORY.png)
+
+```sql
+SELECT category,
+    SUM(sales) AS Total_Sales
 FROM superstore
-GROUP BY Category
+GROUP BY category
 ORDER BY Total_Sales DESC;
+```
 
--- Top 10 Most Profitable Products
-SELECT Product_Name, 
-    ROUND(SUM(Sales), 2) AS Total_Sales,
-    ROUND(SUM(Profit), 2) AS Total_Profit
-FROM superstore
-GROUP BY Product_Name
-ORDER BY Total_Profit DESC
-LIMIT 10;
+---
 
--- Year-wise Sales Trend
-SELECT Year, 
-    ROUND(SUM(Sales), 2) AS Total_Sales,
-    ROUND(SUM(Profit), 2) AS Total_Profit
-FROM superstore
-GROUP BY Year
-ORDER BY Year;
+### 3. Top 3 Customers Per Region (Window Function)
+![Top Customers by Region](top_customers_region.png)
 
--- Top 10 Customers
-SELECT Customer_Name,
-    COUNT(*) AS Total_Orders,
-    ROUND(SUM(Sales), 2) AS Total_Sales
-FROM superstore
-GROUP BY Customer_Name
-ORDER BY Total_Sales DESC
-LIMIT 10;
+```sql
+WITH cte AS (
+    SELECT region, customer_name,
+        SUM(sales) total_sales,
+        DENSE_RANK() OVER (
+            PARTITION BY region
+            ORDER BY SUM(sales) DESC
+        ) rn
+    FROM superstore
+    GROUP BY region, customer_name
+)
+SELECT * FROM cte WHERE rn <= 3;
+```
 
--- Region wise Performance
-SELECT Region,
-    ROUND(SUM(Sales), 2) AS Total_Sales,
-    ROUND(SUM(Profit), 2) AS Total_Profit
-FROM superstore
-GROUP BY Region
-ORDER BY Total_Sales DESC;
+---
+
+### 4. Month-over-Month Growth (LAG Function)
+![MOM Growth](MOM_GROWTH.png)
+
+```sql
+WITH monthly_sales AS (
+    SELECT YEAR(order_date) yr,
+        MONTH(order_date) mn,
+        SUM(sales) revenue
+    FROM superstore
+    GROUP BY YEAR(order_date), MONTH(order_date)
+)
+SELECT *,
+    ROUND(
+        (revenue - LAG(revenue) OVER(ORDER BY yr,mn)) * 100 /
+        LAG(revenue) OVER(ORDER BY yr,mn), 2
+    ) growth_pct
+FROM monthly_sales;
 ```
 
 ---
